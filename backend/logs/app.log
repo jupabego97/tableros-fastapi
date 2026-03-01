@@ -1,0 +1,58 @@
+2026-02-12 21:00:11.068 | INFO     | app.socket_events:connect:27 - Cliente conectado: cfqwZKBotdZja87BAAAC
+2026-02-12 21:00:11.085 | INFO     | app.socket_events:join:38 - Cliente se unió: cfqwZKBotdZja87BAAAC
+2026-02-12 22:11:18.337 | INFO     | app.socket_events:disconnect:33 - Cliente desconectado: cfqwZKBotdZja87BAAAC
+2026-02-12 22:11:35.103 | INFO     | app.socket_events:connect:27 - Cliente conectado: VVvDBXVi21_iYKE5AAAE
+2026-02-12 22:11:39.923 | INFO     | app.socket_events:connect:27 - Cliente conectado: kgIBfv2Dv1Oyd08uAAAH
+2026-02-12 22:11:40.555 | INFO     | app.socket_events:join:38 - Cliente se unió: kgIBfv2Dv1Oyd08uAAAH
+2026-02-12 22:13:04.524 | INFO     | app.socket_events:connect:27 - Cliente conectado: KXQcoUd8bPLlZ6xyAAAE
+2026-02-12 22:13:04.546 | INFO     | app.socket_events:join:38 - Cliente se unió: KXQcoUd8bPLlZ6xyAAAE
+2026-02-12 22:14:02.042 | INFO     | app.socket_events:connect:27 - Cliente conectado: JhSfgF8x-6bosJDVAAAH
+2026-02-12 22:14:02.057 | INFO     | app.socket_events:join:38 - Cliente se unió: JhSfgF8x-6bosJDVAAAH
+2026-02-12 22:15:24.575 | INFO     | app.socket_events:disconnect:33 - Cliente desconectado: KXQcoUd8bPLlZ6xyAAAE
+2026-02-12 22:17:04.545 | INFO     | app.socket_events:connect:27 - Cliente conectado: 4uNQX1yHpCKrwWgbAAAK
+2026-02-12 22:17:04.606 | INFO     | app.socket_events:join:38 - Cliente se unió: 4uNQX1yHpCKrwWgbAAAK
+2026-02-12 22:19:04.599 | INFO     | app.socket_events:disconnect:33 - Cliente desconectado: JhSfgF8x-6bosJDVAAAH
+2026-02-12 22:28:32.383 | INFO     | app.socket_events:connect:27 - Cliente conectado: 8G3QYKMj-n_EecYXAAAI
+2026-02-12 22:28:32.455 | INFO     | app.socket_events:join:38 - Cliente se unió: 8G3QYKMj-n_EecYXAAAI
+2026-02-12 22:28:32.817 | INFO     | app.socket_events:connect:27 - Cliente conectado: qj5orzAYe80iw6hYAAAL
+2026-02-12 22:28:32.843 | INFO     | app.socket_events:join:38 - Cliente se unió: qj5orzAYe80iw6hYAAAL
+2026-02-12 22:30:14.301 | INFO     | app.socket_events:disconnect:33 - Cliente desconectado: 8G3QYKMj-n_EecYXAAAI
+2026-02-12 22:56:38.025 | INFO     | app.socket_events:connect:29 - Cliente conectado: 36chjyR4D_my2hfvAAAB
+2026-02-12 22:56:38.050 | INFO     | app.socket_events:join:40 - Cliente se unió: 36chjyR4D_my2hfvAAAB
+2026-02-12 23:02:09.077 | INFO     | app.socket_events:disconnect:35 - Cliente desconectado: 36chjyR4D_my2hfvAAAB
+2026-02-12 23:02:09.121 | INFO     | app.socket_events:connect:29 - Cliente conectado: XNPFzWvBpVnAj8oOAAAD
+2026-02-12 23:02:09.131 | INFO     | app.socket_events:join:40 - Cliente se unió: XNPFzWvBpVnAj8oOAAAD
+2026-02-12 23:12:41.056 | INFO     | app.socket_events:connect:29 - Cliente conectado: LfpM07kN6hUze_uhAAAB
+2026-02-12 23:12:41.070 | INFO     | app.socket_events:join:40 - Cliente se unió: LfpM07kN6hUze_uhAAAB
+2026-02-12 23:13:12.431 | INFO     | app.socket_events:connect:31 - Cliente conectado: fxj2yhr_mxLAPSC3AAAB
+2026-02-12 23:13:12.441 | INFO     | app.socket_events:join:42 - Cliente se unió: fxj2yhr_mxLAPSC3AAAB
+2026-02-12 23:13:45.371 | INFO     | app.socket_events:connect:30 - Cliente conectado: ujphcFJ4Xvz473LvAAAB
+2026-02-12 23:13:45.384 | INFO     | app.socket_events:join:41 - Cliente se unió: ujphcFJ4Xvz473LvAAAB
+2026-02-12 23:14:15.325 | INFO     | app.socket_events:connect:30 - Cliente conectado: bWQmi2wQGOkD9GqBAAAB
+2026-02-12 23:14:15.341 | INFO     | app.socket_events:join:41 - Cliente se unió: bWQmi2wQGOkD9GqBAAAB
+2026-02-13 01:17:20.899 | INFO     | app.socket_events:disconnect:36 - Cliente desconectado: bWQmi2wQGOkD9GqBAAAB
+2026-02-13 01:17:43.894 | INFO     | app.main:request_id_middleware:81 - [e87305d7] GET /api/tarjetas 3.95s
+2026-02-13 01:17:47.414 | INFO     | app.socket_events:connect:30 - Cliente conectado: iDHOelj0ocLSS1DVAAAF
+2026-02-13 01:17:47.461 | INFO     | app.socket_events:join:41 - Cliente se unió: iDHOelj0ocLSS1DVAAAF
+2026-02-13 01:35:13.396 | INFO     | app.socket_events:connect:30 - Cliente conectado: hP5uqEGNFnizhkLfAAAB
+2026-02-13 01:35:13.409 | INFO     | app.socket_events:join:41 - Cliente se unió: hP5uqEGNFnizhkLfAAAB
+2026-02-13 01:35:31.825 | INFO     | app.socket_events:disconnect:36 - Cliente desconectado: hP5uqEGNFnizhkLfAAAB
+2026-02-13 01:35:31.847 | INFO     | app.socket_events:connect:30 - Cliente conectado: D5PE694vvIZYjOpMAAAD
+2026-02-13 01:35:31.859 | INFO     | app.socket_events:join:41 - Cliente se unió: D5PE694vvIZYjOpMAAAD
+2026-02-13 01:35:52.066 | INFO     | app.socket_events:connect:30 - Cliente conectado: mNFIbSf5eG2D6a7-AAAF
+2026-02-13 01:35:52.078 | INFO     | app.socket_events:join:41 - Cliente se unió: mNFIbSf5eG2D6a7-AAAF
+2026-02-13 01:36:03.410 | INFO     | app.socket_events:disconnect:36 - Cliente desconectado: mNFIbSf5eG2D6a7-AAAF
+2026-02-13 01:36:05.328 | INFO     | app.socket_events:connect:30 - Cliente conectado: kN7WIL26brK0emjTAAAH
+2026-02-13 01:36:05.395 | INFO     | app.socket_events:join:41 - Cliente se unió: kN7WIL26brK0emjTAAAH
+2026-02-13 01:37:13.455 | INFO     | app.socket_events:disconnect:36 - Cliente desconectado: D5PE694vvIZYjOpMAAAD
+2026-02-13 01:37:22.046 | INFO     | app.socket_events:connect:30 - Cliente conectado: VG8lt42yZYKTKLIqAAAB
+2026-02-13 01:37:22.071 | INFO     | app.socket_events:join:41 - Cliente se unió: VG8lt42yZYKTKLIqAAAB
+2026-02-13 01:41:59.593 | INFO     | app.socket_events:disconnect:36 - Cliente desconectado: VG8lt42yZYKTKLIqAAAB
+2026-02-13 01:42:00.572 | INFO     | app.socket_events:connect:30 - Cliente conectado: AKAYKBHiHxVdk9RuAAAD
+2026-02-13 01:42:00.587 | INFO     | app.socket_events:join:41 - Cliente se unió: AKAYKBHiHxVdk9RuAAAD
+2026-02-23 23:47:08.668 | WARNING  | app.services.auth_service:create_default_admin:105 - Usuario admin por defecto creado. Cambie la contraseña inmediatamente.
+2026-02-23 23:51:09.210 | INFO     | app.socket_events:connect:31 - Cliente conectado: ntzu6pmWgzGzEMfoAAAC
+2026-02-23 23:51:09.220 | INFO     | app.socket_events:join_board:52 - Cliente ntzu6pmWgzGzEMfoAAAC se unió al tablero 1
+2026-02-23 23:51:22.964 | WARNING  | app.api.routes.multimedia:procesar_imagen:31 - Intento de procesamiento sin Gemini disponible
+2026-02-23 23:51:56.014 | INFO     | app.socket_events:leave_board:62 - Cliente ntzu6pmWgzGzEMfoAAAC salió del tablero 1
+2026-02-23 23:51:56.020 | INFO     | app.socket_events:disconnect:37 - Cliente desconectado: ntzu6pmWgzGzEMfoAAAC
