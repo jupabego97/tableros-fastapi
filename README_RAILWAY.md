@@ -1,84 +1,162 @@
-# Despliegue en Railway - 3 servicios
+# Despliegue en Railway (GitHub) — checklist de producción
 
-Este proyecto está preparado para desplegarse en Railway con **3 servicios separados**:
+Este repositorio queda preparado para desplegarse en Railway desde GitHub con **3 servicios separados**:
 
-1. **Backend** - API FastAPI + Socket.IO
-2. **Frontend** - SPA React (estático)
-3. **Database** - PostgreSQL
+1. **backend** (FastAPI + Socket.IO)
+2. **frontend** (React + Vite servido como estático)
+3. **postgres** (plugin PostgreSQL de Railway)
 
-## Paso a paso
+---
 
-### 1. Crear proyecto en Railway
+## 0) Diagnóstico rápido de la app (qué debes saber antes de desplegar)
 
-1. Ve a [railway.app](https://railway.app) e inicia sesión
-2. **New Project** → **Deploy from GitHub repo**
-3. Selecciona el repo `reparacionesfastapi`
+### Backend (FastAPI)
+- Expone API REST bajo `/api/*` y health checks en `/health`, `/health/live`, `/health/ready`.
+- Usa `PORT` dinámico de Railway y corre con Uvicorn en `0.0.0.0`.
+- Soporta PostgreSQL por `DATABASE_URL` (convierte automáticamente `postgres://` a `postgresql://`).
+- Ejecuta migraciones Alembic en fase `release` vía `Procfile`.
+- CORS:
+  - Si defines `ALLOWED_ORIGINS`, usa esos orígenes exactos.
+  - Si no defines y estás en producción, permite dominios `*.up.railway.app` por regex.
 
-### 2. Añadir PostgreSQL (servicio BD)
+### Frontend (React)
+- Usa `VITE_API_URL` para apuntar al backend en producción.
+- Se sirve estático desde `dist` con `serve`.
+- Requiere build correcto (Railway/Nixpacks lo hace por `npm run build`).
 
-1. En el proyecto → **+ New** → **Database** → **Add PostgreSQL**
-2. Railway crea el servicio y la variable `DATABASE_URL` automáticamente
+### Base de datos
+- Recomendado usar PostgreSQL administrado por Railway (no SQLite en producción).
 
-### 3. Configurar servicio Backend
+---
 
-1. **+ New** → **GitHub Repo** → `reparacionesfastapi` (o usa el que añadiste)
-2. En el servicio backend → **Settings**:
-   - **Root Directory**: vacío (usa raíz, Procfile hace `cd backend`) **o** `backend` (usa backend/Procfile)
-   - **Build Command**: *(dejar vacío – usa Procfile)*
-   - **Start Command**: *(dejar vacío – usa Procfile)*
-3. **Variables** (o **Variables** en el dashboard):
-   - `DATABASE_URL` → Referencia al servicio PostgreSQL (clic en el add-on y **Connect** → copia la variable)
-   - `ENVIRONMENT` = `production`
-   - `ALLOWED_ORIGINS` = **URL exacta del frontend** (ej: `https://just-wisdom-production-d465.up.railway.app`). Sin esta variable, CORS bloqueará Socket.IO y la API desde otro dominio.
-   - `GEMINI_API_KEY` = *(opcional)*
-   - `SOCKETIO_SAFE_MODE` = `1`
-4. **Settings** → **Networking** → **Generate Domain** para obtener la URL pública del backend (ej: `https://reparacionesfastapi-backend.up.railway.app`)
+## 1) Crear el proyecto en Railway desde GitHub
 
-### 4. Configurar servicio Frontend
+1. Entra a [https://railway.app](https://railway.app).
+2. `New Project` → `Deploy from GitHub repo`.
+3. Selecciona este repositorio.
 
-1. **+ New** → **GitHub Repo** → mismo repo `reparacionesfastapi`
-2. En el servicio frontend → **Settings**:
+---
+
+## 2) Crear servicio PostgreSQL
+
+1. Dentro del proyecto Railway: `+ New` → `Database` → `Add PostgreSQL`.
+2. Railway creará la variable de conexión (`DATABASE_URL`).
+
+---
+
+## 3) Crear servicio backend
+
+1. `+ New` → `GitHub Repo` → selecciona este repo.
+2. En `Settings` del servicio backend:
+   - **Root Directory**: `backend` (**recomendado** para que Railpack detecte Python correctamente)
+   - **Start Command**: vacío (usa Procfile)
+   - **Build Command**: vacío (auto por Nixpacks)
+3. En `Networking`, genera dominio público.
+4. En `Variables`, define:
+
+| Variable | Obligatoria | Valor recomendado |
+|---|---|---|
+| `DATABASE_URL` | Sí | Referencia al servicio PostgreSQL |
+| `ENVIRONMENT` | Sí | `production` |
+| `JWT_SECRET` | Sí | Secreto largo/único (no default) |
+| `ALLOWED_ORIGINS` | Sí | URL exacta del frontend (separadas por coma si varias) |
+| `SOCKETIO_SAFE_MODE` | Recomendado | `1` |
+| `GEMINI_API_KEY` | Opcional | si usas funciones Gemini |
+
+> Importante: **no** dejes `JWT_SECRET` por defecto en producción.
+
+---
+
+## 4) Crear servicio frontend
+
+1. `+ New` → `GitHub Repo` → mismo repo.
+2. En `Settings` del frontend:
    - **Root Directory**: `frontend`
-   - **Build Command**: *(dejar vacío o* `npm run build`*)*
-   - **Start Command**: *(dejar vacío – usa Procfile)*
-3. **Variables** (obligatorias para que carguen las tarjetas):
-   - `VITE_API_URL` = URL del backend (ej: `https://reparacionesfastapi-production.up.railway.app`)
-   - Sin barra final (`/`). Se usa en build: si no está, las tarjetas no cargan (fetch va al mismo dominio y falla).
-4. **Settings** → **Networking** → **Generate Domain**
+   - **Start Command**: vacío (Railpack lo sirve como estático con Caddy)
+   - **Build Command**: vacío (Railpack ejecuta `npm run build`)
+3. Genera dominio público en `Networking`.
+4. Variables:
 
-### 5. Migraciones de BD
+| Variable | Obligatoria | Ejemplo |
+|---|---|---|
+| `VITE_API_URL` | Sí | `https://<tu-backend>.up.railway.app` |
 
-En el **servicio backend** → **Settings** → **Deploy**:
+> Sin `VITE_API_URL`, el frontend intentará consumir API del mismo dominio y fallará en producción separada.
 
-- **Predeploy Command** (o ejecutar manualmente una vez):
-  ```
-  cd backend && python -m alembic upgrade head
-  ```
+---
 
-O desde la consola del servicio backend:
-```bash
-cd backend && python -m alembic upgrade head
-```
+## 5) Orden recomendado de configuración
 
-### 6. Orden de variables (ALLOWED_ORIGINS)
+1. Despliega backend y frontend para obtener dominios.
+2. Coloca `VITE_API_URL` en frontend con el dominio backend.
+3. Coloca `ALLOWED_ORIGINS` en backend con el dominio frontend.
+4. Redeploy de ambos servicios.
 
-1. Despliega primero **backend** y **frontend** para tener sus URLs
-2. Añade en **Backend** la variable `ALLOWED_ORIGINS` con la URL del frontend
-3. En **Frontend** añade `VITE_API_URL` con la URL del backend
-4. Redespliega ambos servicios para aplicar las variables
+---
 
-## Resumen de variables
+## 6) Validación post-despliegue
 
-| Servicio   | Variable         | Ejemplo                                                    |
-|------------|------------------|------------------------------------------------------------|
-| Backend    | DATABASE_URL     | `postgresql://...` (de add-on PostgreSQL)                  |
-| Backend    | ENVIRONMENT      | `production`                                               |
-| Backend    | ALLOWED_ORIGINS  | URL exacta del frontend (ej: `https://just-wisdom-production-d465.up.railway.app`). **Obligatorio** para CORS cross-origin |
-| Backend    | GEMINI_API_KEY   | *(opcional)*                                               |
-| Backend    | SOCKETIO_SAFE_MODE | `1`                                                      |
-| Frontend   | VITE_API_URL     | `https://reparacionesfastapi-backend.up.railway.app`      |
+### Backend
+- `GET https://<backend>/health` → `ok: true`
+- `GET https://<backend>/health/ready` → listo
 
-## Procfiles
+### Frontend
+- Abre `https://<frontend>` y valida:
+  - login carga,
+  - listado de tarjetas,
+  - creación/edición,
+  - tiempo real (Socket.IO).
 
-- **Raíz** (backend): `web: cd backend && uvicorn app.socket_app:socket_app --host 0.0.0.0 --port $PORT`
-- **frontend/Procfile**: `web: npm run build && npx serve -s dist -l $PORT`
+### CORS
+Si ves errores de CORS, revisa que:
+- `ALLOWED_ORIGINS` tenga la URL exacta de frontend,
+- sin slash final,
+- redeploy aplicado.
+
+---
+
+## 7) Archivos relevantes para Railway en este repo
+
+- `Procfile` (raíz): release + web del backend (útil si usas root `.` en backend).
+- `backend/Procfile`: **recomendado** cuando backend usa root `backend`.
+- `backend/runtime.txt`: fija Python 3.11 para build compatible.
+- `railway.json`: política de despliegue (replicas/restart).
+
+> Nota: En frontend con root `frontend`, no necesitas `frontend/Procfile`; Railpack detecta Vite estático y lo sirve con Caddy automáticamente.
+
+---
+
+## 8) Troubleshooting rápido
+
+### Error de conexión DB
+- Verifica que backend esté conectado al servicio PostgreSQL correcto.
+- Confirma `DATABASE_URL` en variables del backend.
+
+### Error 401/403 inesperado
+- Revisa `JWT_SECRET` entre despliegues (si cambia, invalida tokens).
+
+### Socket.IO no conecta
+- Revisar `ALLOWED_ORIGINS` y dominio final del frontend.
+- Confirmar que backend usa HTTPS público de Railway.
+
+### Frontend muestra pantalla pero no datos
+- Confirmar `VITE_API_URL` correcto y sin slash final.
+
+### Frontend usa `serve` en deploy en vez de Caddy
+- Si en logs ves `Found web command in Procfile` y luego `npx serve ...`, elimina `frontend/Procfile`.
+- Railway/Railpack para Vite estático funciona mejor dejando `Start Command` vacío y sin Procfile en `frontend`.
+
+
+### `/bin/bash: npx: command not found` en frontend
+Esto casi siempre significa que Railway sigue ejecutando un **Start Command heredado** (por ejemplo `npx serve -s dist -l $PORT`).
+
+Pasos para corregirlo:
+1. En servicio **frontend** → `Settings`:
+   - `Root Directory = frontend`
+   - `Build Command =` vacío
+   - `Start Command =` vacío (**borra cualquier `npx ...` guardado**)
+2. Confirma que no exista `frontend/Procfile` en el repo.
+3. Haz `Redeploy` del frontend (preferible `Deploy Latest Commit`).
+4. Verifica en logs que aparezca serving estático con Caddy/Railpack y que ya no se ejecute `npx`.
+
+Si necesitas comando manual de emergencia (no recomendado para producción estática), usa `npm exec --yes serve -s dist -l $PORT` en vez de `npx ...`.
