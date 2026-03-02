@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
     # Crear admin por defecto
     db = SessionLocal()
     try:
-        if settings.create_default_admin_on_boot and not settings.is_production:
+        if settings.create_default_admin_on_boot:
             from app.services.auth_service import create_default_admin
             create_default_admin(db)
     finally:
