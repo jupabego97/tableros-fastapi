@@ -56,7 +56,7 @@ class StorageService:
                 ext = "jpeg"
 
             raw = base64.b64decode(encoded)
-            key = f"repairs/{datetime.now(UTC).strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
+            key = f"tableros/{datetime.now(UTC).strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
             self._client.put_object(Bucket=self._bucket, Key=key, Body=raw, ContentType=content_type)
             url = self.build_public_url(key)
             logger.info(f"Imagen subida a S3: {key}")
@@ -79,7 +79,7 @@ class StorageService:
                 ext = "jpeg"
 
             raw = base64.b64decode(encoded)
-            key = f"repairs/{datetime.now(UTC).strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
+            key = f"tableros/{datetime.now(UTC).strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
             self._client.put_object(Bucket=self._bucket, Key=key, Body=raw, ContentType=content_type)
             return {"url": self.build_public_url(key), "storage_key": key}
         except Exception as e:
@@ -90,7 +90,7 @@ class StorageService:
         if not self.use_s3 or not self._client:
             raise RuntimeError("Storage remoto no disponible para media_v2")
         try:
-            key = f"repairs/{datetime.now(UTC).strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
+            key = f"tableros/{datetime.now(UTC).strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
             self._client.put_object(Bucket=self._bucket, Key=key, Body=content, ContentType=mime_type)
             return {"url": self.build_public_url(key), "storage_key": key}
         except Exception as e:
