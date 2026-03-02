@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { Board } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import CreateBoardModal from './CreateBoardModal';
+import CambiarPasswordModal from './CambiarPasswordModal';
 
 interface Props {
   onSelectBoard: (board: Board) => void;
@@ -15,6 +16,7 @@ export default function BoardsHome({ onSelectBoard, theme, onToggleTheme }: Prop
   const { user, logout } = useAuth();
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [showChangePwd, setShowChangePwd] = useState(false);
 
   const { data: boards = [], isLoading } = useQuery<Board[]>({
     queryKey: ['boards'],
@@ -46,6 +48,9 @@ export default function BoardsHome({ onSelectBoard, theme, onToggleTheme }: Prop
               {user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <span className="user-name">{user?.full_name}</span>
+            <button className="btn-logout" onClick={() => setShowChangePwd(true)} title="Cambiar contraseña" aria-label="Cambiar contraseña">
+              <i className="fas fa-key"></i>
+            </button>
             <button className="btn-logout" onClick={logout} title="Cerrar sesion" aria-label="Cerrar sesion">
               <i className="fas fa-sign-out-alt"></i>
             </button>
@@ -108,6 +113,8 @@ export default function BoardsHome({ onSelectBoard, theme, onToggleTheme }: Prop
           </div>
         )}
       </div>
+
+      {showChangePwd && <CambiarPasswordModal onClose={() => setShowChangePwd(false)} />}
 
       {showCreate && (
         <CreateBoardModal
