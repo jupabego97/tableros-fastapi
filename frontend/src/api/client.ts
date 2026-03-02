@@ -347,6 +347,13 @@ export const api = {
     await ensureOk(res);
     return res.json();
   },
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+      method: 'PUT', headers: jsonHeaders(),
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    });
+    await ensureOk(res);
+  },
 
   // --- Boards ---
   async getBoards(): Promise<Board[]> {

@@ -16,6 +16,7 @@ import BulkActionsBar from './BulkActionsBar';
 import { EmptyState, ErrorState } from './UiState';
 import { useDebounce } from '../hooks/useDebounce';
 import { API_BASE } from '../api/client';
+import CambiarPasswordModal from './CambiarPasswordModal';
 
 const NuevaTarjetaModal = lazy(() => import('./NuevaTarjetaModal'));
 const EditarTarjetaModal = lazy(() => import('./EditarTarjetaModal'));
@@ -150,6 +151,7 @@ export default function BoardView({ board, onBack, theme, onThemeChange }: Props
   const [undoAction, setUndoAction] = useState<{ cardId: number; oldCol: string; msg: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showChangePwd, setShowChangePwd] = useState(false);
   const [activeSavedViewId, setActiveSavedViewId] = useState<string>('');
   const hasAppliedDefaultViewRef = useRef(false);
 
@@ -560,6 +562,9 @@ export default function BoardView({ board, onBack, theme, onThemeChange }: Props
               {user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <span className="user-name">{user?.full_name}</span>
+            <button className="btn-logout" onClick={() => setShowChangePwd(true)} title="Cambiar contraseña" aria-label="Cambiar contraseña">
+              <i className="fas fa-key"></i>
+            </button>
             <button className="btn-logout" onClick={logout} title="Cerrar sesion" aria-label="Cerrar sesion">
               <i className="fas fa-sign-out-alt"></i>
             </button>
@@ -705,6 +710,7 @@ export default function BoardView({ board, onBack, theme, onThemeChange }: Props
       )}
 
       {showActivity && <ActivityFeed boardId={boardId} onClose={() => setShowActivity(false)} />}
+      {showChangePwd && <CambiarPasswordModal onClose={() => setShowChangePwd(false)} />}
 
       <button className="mobile-fab-new" onClick={() => setShowNew(true)} title="Nueva garantia" aria-label="Crear nueva garantia">
         <i className="fas fa-plus"></i>
