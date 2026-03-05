@@ -9,12 +9,6 @@ interface Props {
   onSuccess?: () => void;
 }
 
-function defaultTomorrowDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
-}
-
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   useEffect(() => {
@@ -27,8 +21,7 @@ function useIsMobile(): boolean {
 }
 
 export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props) {
-  const [step, setStep] = useState<'capture' | 'preview' | 'processing' | 'form'>('capture');
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<'capture' | 'preview' | 'form'>('capture');
   const [error, setError] = useState('');
   const [flash, setFlash] = useState(false);
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
@@ -46,7 +39,7 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
     numero_factura: '',
     problema: '',
     whatsapp: '',
-    fecha_limite: defaultTomorrowDate(),
+    fecha_limite: '',
     imagen_url: '',
     prioridad: 'media',
     asignado_a: '' as string | number,
@@ -111,7 +104,10 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
   };
 
   const confirmPhoto = () => {
-    if (capturedPreview) processImage(capturedPreview);
+    if (!capturedPreview) return;
+    setForm(prev => ({ ...prev, imagen_url: capturedPreview }));
+    setCapturedPreview(null);
+    setStep('form');
   };
 
   const retakePhoto = () => {
@@ -136,52 +132,16 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
     }));
     Promise.all(readers).then(previews => {
       setPhotoPreviews(previews.filter(Boolean));
-      if (previews[0]) processImage(previews[0]);
-      else setStep('form');
+      setStep('form');
     });
-  };
-
-  const processImage = async (imageData: string) => {
-    setLoading(true);
-    setError('');
-    setStep('processing');
-    try {
-      const result = await api.procesarImagen(imageData);
-      setForm(prev => ({
-        ...prev,
-        nombre_cliente: result.nombre || prev.nombre_cliente,
-        whatsapp: result.telefono || prev.whatsapp,
-        imagen_url: imageData,
-      }));
-      if (result._partial) {
-        setError('IA no disponible. Completa los datos manualmente.');
-      }
-    } catch {
-      setForm(prev => ({ ...prev, imagen_url: imageData }));
-      setError('No se pudo analizar la imagen. Completa los datos manualmente.');
-    }
-    setCapturedPreview(null);
-    setStep('form');
-    setLoading(false);
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-      setCameraActive(false);
-    }
   };
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!form.nombre_cliente.trim()) errs.nombre = 'El nombre del cliente es requerido';
     if (form.whatsapp && !/^\+?\d{7,15}$/.test(form.whatsapp.replace(/[\s-]/g, ''))) {
       errs.whatsapp = 'Formato: +57 300 123 4567';
     }
-    if (!form.fecha_limite) errs.fecha = 'La fecha límite es requerida';
     setValidationErrors(errs);
-    if (Object.keys(errs).length > 0) {
-      setTimeout(() => {
-        document.querySelector('.field-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
-    }
     return Object.keys(errs).length === 0;
   };
 
@@ -189,12 +149,12 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
     if (!validate()) return;
     try {
       const created = await createMut.mutateAsync({
-        nombre_cliente: form.nombre_cliente.trim(),
+        nombre_cliente: form.nombre_cliente.trim() || undefined,
         producto: form.producto.trim() || undefined,
         numero_factura: form.numero_factura.trim() || undefined,
-        problema: form.problema.trim() || 'Sin descripción',
-        whatsapp: form.whatsapp.trim(),
-        fecha_limite: form.fecha_limite,
+        problema: form.problema.trim() || undefined,
+        whatsapp: form.whatsapp.trim() || undefined,
+        fecha_limite: form.fecha_limite || undefined,
         imagen_url: photoFiles.length > 0 ? undefined : (form.imagen_url || undefined),
         prioridad: form.prioridad,
         asignado_a: form.asignado_a ? Number(form.asignado_a) : undefined,
@@ -234,7 +194,7 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
             <div className={`capture-step ${isMobile && cameraActive ? 'camera-fullscreen' : ''}`}>
               {!cameraActive && (
                 <p className="capture-instructions">
-                  <i className="fas fa-magic"></i> Toma una foto del equipo y la IA extraerá los datos automáticamente
+                  <i className="fas fa-camera"></i> Toma una foto del equipo
                 </p>
               )}
               {cameraActive ? (
@@ -247,9 +207,9 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
                   {flash && <div className="capture-flash" aria-hidden="true" />}
                   <video ref={videoRef} autoPlay playsInline muted className="camera-preview" />
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
-                  <button className="btn-capture btn-capture-large" onClick={capturePhoto} disabled={loading}
+                  <button className="btn-capture btn-capture-large" onClick={capturePhoto}
                     type="button" aria-label="Tomar foto">
-                    {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-camera"></i>}
+                    <i className="fas fa-camera"></i>
                   </button>
                 </div>
               ) : (
@@ -269,15 +229,6 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
                   </button>
                 </div>
               )}
-              {loading && <div className="ai-loading"><i className="fas fa-brain fa-pulse"></i> Procesando con IA...</div>}
-            </div>
-          )}
-
-          {step === 'processing' && (
-            <div className="ai-processing-screen">
-              <i className="fas fa-brain fa-pulse"></i>
-              <p>Analizando imagen con IA...</p>
-              <div className="ai-processing-bar" />
             </div>
           )}
 
@@ -291,8 +242,8 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
                 <button className="btn-cancel" onClick={retakePhoto} type="button">
                   <i className="fas fa-redo"></i> Repetir
                 </button>
-                <button className="btn-save" onClick={confirmPhoto} disabled={loading} type="button">
-                  {loading ? <><i className="fas fa-spinner fa-spin"></i> Procesando...</> : <><i className="fas fa-check"></i> Aceptar</>}
+                <button className="btn-save" onClick={confirmPhoto} type="button">
+                  <i className="fas fa-check"></i> Aceptar
                 </button>
               </div>
             </div>
@@ -301,39 +252,10 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
           {step === 'form' && (
             <div className="edit-form">
               <div className="form-essentials">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label><i className="fas fa-user"></i> Cliente *</label>
-                    <input value={form.nombre_cliente} onChange={e => setForm({ ...form, nombre_cliente: e.target.value })}
-                      className={validationErrors.nombre ? 'error' : ''} autoFocus />
-                    {validationErrors.nombre && <span className="field-error">{validationErrors.nombre}</span>}
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fab fa-whatsapp"></i> WhatsApp</label>
-                    <input value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })}
-                      placeholder="+57 300 123 4567" className={validationErrors.whatsapp ? 'error' : ''} />
-                    {validationErrors.whatsapp && <span className="field-error">{validationErrors.whatsapp}</span>}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label><i className="fas fa-box"></i> Producto</label>
-                    <input value={form.producto} onChange={e => setForm({ ...form, producto: e.target.value })} placeholder="Modelo o descripción del equipo" />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-file-invoice"></i> N° Factura</label>
-                    <input value={form.numero_factura} onChange={e => setForm({ ...form, numero_factura: e.target.value })} placeholder="Opcional" />
-                  </div>
-                </div>
                 <div className="form-group">
-                  <label><i className="fas fa-exclamation-circle"></i> Problema</label>
-                  <textarea rows={isMobile ? 2 : 3} value={form.problema} onChange={e => setForm({ ...form, problema: e.target.value })} placeholder="Describe el problema reportado..." />
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-calendar"></i> Fecha límite *</label>
-                  <input type="date" value={form.fecha_limite} onChange={e => setForm({ ...form, fecha_limite: e.target.value })}
-                    className={validationErrors.fecha ? 'error' : ''} />
-                  {validationErrors.fecha && <span className="field-error">{validationErrors.fecha}</span>}
+                  <label><i className="fas fa-exclamation-circle"></i> Descripción del problema</label>
+                  <textarea rows={isMobile ? 3 : 4} value={form.problema} onChange={e => setForm({ ...form, problema: e.target.value })}
+                    placeholder="Describe el problema reportado..." autoFocus />
                 </div>
               </div>
 
@@ -344,6 +266,32 @@ export default function NuevaTarjetaModal({ boardId, onClose, onSuccess }: Props
                 </button>
                 {advancedOpen && (
                   <div className="form-advanced-content">
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label><i className="fas fa-user"></i> Cliente</label>
+                        <input value={form.nombre_cliente} onChange={e => setForm({ ...form, nombre_cliente: e.target.value })} placeholder="Nombre del cliente" />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fab fa-whatsapp"></i> WhatsApp</label>
+                        <input value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })}
+                          placeholder="+57 300 123 4567" className={validationErrors.whatsapp ? 'error' : ''} />
+                        {validationErrors.whatsapp && <span className="field-error">{validationErrors.whatsapp}</span>}
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label><i className="fas fa-box"></i> Producto</label>
+                        <input value={form.producto} onChange={e => setForm({ ...form, producto: e.target.value })} placeholder="Modelo o descripción del equipo" />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-file-invoice"></i> N° Factura</label>
+                        <input value={form.numero_factura} onChange={e => setForm({ ...form, numero_factura: e.target.value })} placeholder="Opcional" />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-calendar"></i> Fecha límite</label>
+                      <input type="date" value={form.fecha_limite} onChange={e => setForm({ ...form, fecha_limite: e.target.value })} />
+                    </div>
                     <div className="form-row">
                       <div className="form-group">
                         <label><i className="fas fa-flag"></i> Prioridad</label>
