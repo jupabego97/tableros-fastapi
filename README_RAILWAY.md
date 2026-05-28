@@ -14,7 +14,7 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 - Expone API REST bajo `/api/*` y health checks en `/health`, `/health/live`, `/health/ready`.
 - Usa `PORT` dinámico de Railway y corre con Uvicorn en `0.0.0.0`.
 - Soporta PostgreSQL por `DATABASE_URL` (convierte automáticamente `postgres://` a `postgresql://`).
-- Ejecuta migraciones Alembic en fase `release` vía `Procfile`.
+- Ejecuta migraciones Alembic con reintentos en fase `release` vía `Procfile`; si despliegas con root `backend`, `backend/Procfile` también usa el mismo runner con reintentos.
 - CORS:
   - Si defines `ALLOWED_ORIGINS`, usa esos orígenes exactos.
   - Si no defines y estás en producción, permite dominios `*.up.railway.app` por regex.
@@ -56,12 +56,15 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 
 | Variable | Obligatoria | Valor recomendado |
 |---|---|---|
-| `DATABASE_URL` | Sí | Referencia al servicio PostgreSQL |
+| `DATABASE_URL` | Sí | URL privada/internal del servicio PostgreSQL; evita URLs `*.proxy.rlwy.net` para backend dentro de Railway |
+| `DATABASE_PRIVATE_URL` | Recomendado | URL privada de PostgreSQL (`*.railway.internal`) si `DATABASE_URL` quedó apuntando al proxy público |
 | `ENVIRONMENT` | Sí | `production` |
 | `JWT_SECRET` | Sí | Secreto largo/único (no default) |
 | `ALLOWED_ORIGINS` | Sí | URL exacta del frontend (separadas por coma si varias) |
 | `SOCKETIO_SAFE_MODE` | Recomendado | `1` |
 | `GEMINI_API_KEY` | Opcional | si usas funciones Gemini |
+| `MIGRATION_MAX_ATTEMPTS` | Opcional | `8` por defecto; súbelo si Railway/Postgres tarda en aceptar conexiones |
+| `MIGRATION_RETRY_BASE_SECONDS` | Opcional | `2` por defecto; espera base entre reintentos de migración |
 
 > Importante: **no** dejes `JWT_SECRET` por defecto en producción.
 
@@ -117,8 +120,8 @@ Si ves errores de CORS, revisa que:
 
 ## 7) Archivos relevantes para Railway en este repo
 
-- `Procfile` (raíz): release + web del backend.
-- `backend/Procfile`: alternativa si despliegas backend con root `backend`.
+- `Procfile` (raíz): release con `backend/scripts/run_migrations.py` + web del backend.
+- `backend/Procfile`: alternativa si despliegas backend con root `backend`; ejecuta `backend/scripts/run_migrations.py` antes de iniciar Uvicorn.
 - `frontend/Procfile`: sirve build estático desde `dist`.
 - `backend/runtime.txt`: fija Python 3.11 para build compatible.
 - `railway.json`: política de despliegue (replicas/restart).
@@ -129,7 +132,9 @@ Si ves errores de CORS, revisa que:
 
 ### Error de conexión DB
 - Verifica que backend esté conectado al servicio PostgreSQL correcto.
-- Confirma `DATABASE_URL` en variables del backend.
+- Confirma `DATABASE_URL` en variables del backend. Para servicios dentro del mismo proyecto Railway, usa la URL privada/internal (`*.railway.internal`), no el TCP proxy público (`*.proxy.rlwy.net`).
+- Si `DATABASE_URL` ya quedó apuntando a `*.proxy.rlwy.net`, agrega `DATABASE_PRIVATE_URL` con la URL privada del Postgres; el backend la preferirá automáticamente para evitar el proxy público.
+- Si los logs muestran `psycopg2.OperationalError` durante `alembic upgrade head` o `server closed the connection unexpectedly`, suele ser un corte del proxy público/Postgres de Railway durante migraciones. El runner `backend/scripts/run_migrations.py` reintenta automáticamente, pero la solución recomendada es usar la URL privada; también puedes aumentar `MIGRATION_MAX_ATTEMPTS` si la base tarda más en estar disponible.
 
 ### Error 401/403 inesperado
 - Revisa `JWT_SECRET` entre despliegues (si cambia, invalida tokens).
