@@ -2,6 +2,8 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from loguru import logger
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -24,23 +26,36 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.post("/login")
 @limiter.limit("20 per minute")
 def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data.username).first()
+    try:
+        user = db.query(User).filter(User.username == data.username).first()
+    except SQLAlchemyError as exc:
+        logger.exception("Login failed while reading the users table")
+        raise HTTPException(status_code=503, detail="Servicio de autenticación no disponible") from exc
+
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Usuario desactivado")
 
-    user.last_login = datetime.now(UTC)
-    db.commit()
-
     settings = get_settings()
+    token = create_token(user)
+    user_payload = user.to_dict()
+    user_role = user.role
+
+    user.last_login = datetime.now(UTC)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.warning("No se pudo actualizar last_login durante el login; se continuará la sesión")
+
     return {
-        "access_token": create_token(user),
+        "access_token": token,
         "token_type": "bearer",
-        "user": user.to_dict(),
+        "user": user_payload,
         "session": {
             "exp_minutes": settings.jwt_expire_minutes,
-            "role": user.role,
+            "role": user_role,
         },
     }
 
