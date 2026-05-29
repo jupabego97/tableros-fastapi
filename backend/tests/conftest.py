@@ -10,10 +10,7 @@ from datetime import UTC
 import pytest
 from app.core.database import Base, SessionLocal, engine, get_db
 from app.main import app
-from app.models import (
-    RepairCard,
-    User,
-)
+from app.models import Board, User, WarrantyCard
 from app.services.auth_service import create_token, hash_password
 from fastapi.testclient import TestClient
 
@@ -99,18 +96,27 @@ def tech_headers(tech_user):
 
 
 @pytest.fixture
-def sample_tarjeta(db_session):
-    """Create a sample repair card."""
-    from datetime import datetime
-    card = RepairCard(
-        owner_name="Juan Perez",
+def sample_board(db_session):
+    board = Board(name="Tablero test", color="#0369a1")
+    db_session.add(board)
+    db_session.commit()
+    db_session.refresh(board)
+    return board
+
+
+@pytest.fixture
+def sample_tarjeta(db_session, sample_board):
+    """Create a sample warranty card."""
+    now = __import__("datetime").datetime.now(UTC)
+    card = WarrantyCard(
+        board_id=sample_board.id,
+        client_name="Juan Perez",
         problem="Pantalla rota",
         whatsapp_number="5551234567",
-        start_date=datetime.now(UTC),
-        due_date=datetime.now(UTC),
-        status="ingresado",
-        ingresado_date=datetime.now(UTC),
-        has_charger="si",
+        start_date=now,
+        due_date=now,
+        status="recibido",
+        recibido_date=now,
         priority="media",
         position=1,
     )

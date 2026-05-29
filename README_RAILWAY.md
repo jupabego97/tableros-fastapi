@@ -56,7 +56,8 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 
 | Variable | Obligatoria | Valor recomendado |
 |---|---|---|
-| `DATABASE_URL` | Sí | Referencia al servicio PostgreSQL |
+| `DATABASE_URL` | Sí | URL privada/internal del PostgreSQL (`*.railway.internal`); evita `*.proxy.rlwy.net` para backend dentro de Railway |
+| `DATABASE_PRIVATE_URL` | Recomendado | URL privada si `DATABASE_URL` apunta al proxy público TCP |
 | `ENVIRONMENT` | Sí | `production` |
 | `JWT_SECRET` | Sí | Secreto largo/único (no default) |
 | `ALLOWED_ORIGINS` | Sí | URL exacta del frontend (separadas por coma si varias) |
@@ -131,8 +132,9 @@ Si ves errores de CORS, revisa que:
 
 ### Error de conexión DB
 - Verifica que backend esté conectado al servicio PostgreSQL correcto.
-- Confirma `DATABASE_URL` en variables del backend.
-- Si los logs muestran `psycopg2.OperationalError` durante `alembic upgrade head` o `server closed the connection unexpectedly`, suele ser un corte transitorio del proxy/Postgres de Railway durante migraciones. El runner `backend/scripts/run_migrations.py` reintenta automáticamente; puedes aumentar `MIGRATION_MAX_ATTEMPTS` si la base tarda más en estar disponible.
+- Confirma `DATABASE_URL` en variables del backend. Para servicios dentro del mismo proyecto Railway, usa la URL privada/internal (`*.railway.internal`), no el TCP proxy público (`*.proxy.rlwy.net`).
+- Si `DATABASE_URL` quedó apuntando a `*.proxy.rlwy.net`, agrega `DATABASE_PRIVATE_URL` con la URL privada del Postgres; el backend la preferirá automáticamente.
+- Si los logs muestran `psycopg2.OperationalError` o `server closed the connection unexpectedly` contra `*.proxy.rlwy.net`, la solución recomendada es la URL privada. El runner `backend/scripts/run_migrations.py` reintenta automáticamente; también puedes aumentar `MIGRATION_MAX_ATTEMPTS`.
 
 ### Error 401/403 inesperado
 - Revisa `JWT_SECRET` entre despliegues (si cambia, invalida tokens).

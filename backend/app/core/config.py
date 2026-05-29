@@ -6,6 +6,10 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./tableros.db"
+    database_private_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("DATABASE_PRIVATE_URL", "POSTGRES_PRIVATE_URL"),
+    )
     environment: str = "development"
     allowed_origins: str = ""
     gemini_api_key: str = ""

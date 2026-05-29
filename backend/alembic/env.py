@@ -1,7 +1,7 @@
 from logging.config import fileConfig
 
 from alembic import context
-from app.core.database import get_database_url
+from app.core.database import _postgresql_connect_args, get_database_url
 from app.models import Base
 from sqlalchemy import pool
 
@@ -30,18 +30,6 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def _connect_args(url: str) -> dict:
-    if url.startswith("postgresql"):
-        return {
-            "connect_timeout": 10,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
-        }
-    return {}
-
-
 def run_migrations_online() -> None:
     from sqlalchemy import create_engine
 
@@ -50,7 +38,7 @@ def run_migrations_online() -> None:
         url,
         poolclass=pool.NullPool,
         pool_pre_ping=True,
-        connect_args=_connect_args(url),
+        connect_args=_postgresql_connect_args(url),
     )
 
     with connectable.connect() as connection:
