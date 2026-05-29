@@ -1,3 +1,5 @@
+import asyncio
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -67,27 +69,56 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     setup_logging(settings.environment)
     if settings.is_production and settings.is_default_jwt_secret:
-        raise RuntimeError("JWT_SECRET inseguro en producción. Configure un valor fuerte en entorno.")
+        strict_jwt = os.getenv("STRICT_JWT_SECRET", "1").strip().lower() not in {"0", "false", "no"}
+        if strict_jwt:
+            raise RuntimeError("JWT_SECRET inseguro en producción. Configure un valor fuerte en entorno.")
+        logger.error(
+            "JWT_SECRET por defecto en producción. Configure JWT_SECRET o el servicio quedará inseguro."
+        )
 
-    # Crear tablas nuevas automáticamente solo en entornos no productivos
+    # Migraciones en background: Uvicorn ya escucha en PORT (evita 'Crashed' en Railway)
+    migration_task = asyncio.create_task(asyncio.to_thread(_run_startup_migrations))
+
     if not settings.is_production:
         Base.metadata.create_all(bind=engine)
 
-    # Crear admin por defecto
-    db = SessionLocal()
-    try:
-        if settings.create_default_admin_on_boot:
-            from app.services.auth_service import create_default_admin
-            create_default_admin(db)
-    finally:
-        db.close()
-
-    # Corregir secuencia PostgreSQL en producción
-    if settings.is_production:
-        _fix_postgresql_sequence()
+    _run_startup_db_tasks(settings)
 
     yield
+
+    if not migration_task.done():
+        migration_task.cancel()
     executor.shutdown(wait=True)
+
+
+def _run_startup_migrations() -> None:
+    from app.core.migrations import run_migrations
+
+    if not run_migrations():
+        logger.error(
+            "Migraciones no completadas. Revise DATABASE_URL / Postgres en Railway. "
+            "La API responde en /health/live pero la BD puede fallar."
+        )
+
+
+def _run_startup_db_tasks(settings) -> None:
+    try:
+        db = SessionLocal()
+        try:
+            if settings.create_default_admin_on_boot:
+                from app.services.auth_service import create_default_admin
+
+                create_default_admin(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Startup DB tasks skipped (DB unavailable?): {e}")
+
+    if settings.is_production:
+        try:
+            _fix_postgresql_sequence()
+        except Exception as e:
+            logger.warning(f"PostgreSQL sequence fix skipped: {e}")
 
 
 def _fix_postgresql_sequence() -> None:

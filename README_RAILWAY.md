@@ -14,7 +14,7 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 - Expone API REST bajo `/api/*` y health checks en `/health`, `/health/live`, `/health/ready`.
 - Usa `PORT` dinámico de Railway y corre con Uvicorn en `0.0.0.0`.
 - Soporta PostgreSQL por `DATABASE_URL` (convierte automáticamente `postgres://` a `postgresql://`).
-- Ejecuta migraciones Alembic con reintentos al **arranque del proceso web** (no en `release`), porque la red privada de Railway suele estar lista solo cuando el contenedor web ya está activo.
+- Uvicorn abre el puerto **de inmediato**; las migraciones Alembic corren en segundo plano al iniciar (evita estado `Crashed` en Railway por healthcheck sin puerto).
 - CORS:
   - Si defines `ALLOWED_ORIGINS`, usa esos orígenes exactos.
   - Si no defines y estás en producción, permite dominios `*.up.railway.app` por regex.
