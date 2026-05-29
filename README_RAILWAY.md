@@ -14,7 +14,7 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 - Expone API REST bajo `/api/*` y health checks en `/health`, `/health/live`, `/health/ready`.
 - Usa `PORT` dinámico de Railway y corre con Uvicorn en `0.0.0.0`.
 - Soporta PostgreSQL por `DATABASE_URL` (convierte automáticamente `postgres://` a `postgresql://`).
-- Ejecuta migraciones Alembic con reintentos en fase `release` vía `Procfile`; si despliegas con root `backend`, `backend/Procfile` también usa el mismo runner con reintentos.
+- Ejecuta migraciones Alembic con reintentos al **arranque del proceso web** (no en `release`), porque la red privada de Railway suele estar lista solo cuando el contenedor web ya está activo.
 - CORS:
   - Si defines `ALLOWED_ORIGINS`, usa esos orígenes exactos.
   - Si no defines y estás en producción, permite dominios `*.up.railway.app` por regex.
@@ -63,8 +63,11 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 | `ALLOWED_ORIGINS` | Sí | URL exacta del frontend (separadas por coma si varias) |
 | `SOCKETIO_SAFE_MODE` | Recomendado | `1` |
 | `GEMINI_API_KEY` | Opcional | si usas funciones Gemini |
-| `MIGRATION_MAX_ATTEMPTS` | Opcional | `8` por defecto; súbelo si Railway/Postgres tarda en aceptar conexiones |
-| `MIGRATION_RETRY_BASE_SECONDS` | Opcional | `2` por defecto; espera base entre reintentos de migración |
+| `MIGRATION_MAX_ATTEMPTS` | Opcional | `12` por intento y URL; súbelo si Postgres tarda en arrancar |
+| `MIGRATION_INITIAL_DELAY_SECONDS` | Opcional | `15` por defecto; espera antes del primer intento (warm-up de Postgres) |
+| `MIGRATION_RETRY_BASE_SECONDS` | Opcional | `3` por defecto; espera base entre reintentos |
+| `MIGRATION_FALLBACK_PUBLIC` | Opcional | `1` por defecto; si la URL privada hace timeout, prueba el proxy TCP público |
+| `DB_CONNECT_TIMEOUT` | Opcional | `30` segundos para conectar a Postgres |
 
 > Importante: **no** dejes `JWT_SECRET` por defecto en producción.
 
@@ -120,8 +123,8 @@ Si ves errores de CORS, revisa que:
 
 ## 7) Archivos relevantes para Railway en este repo
 
-- `Procfile` (raíz): release con `backend/scripts/run_migrations.py` + web del backend.
-- `backend/Procfile`: alternativa si despliegas backend con root `backend`; ejecuta `backend/scripts/run_migrations.py` antes de iniciar Uvicorn.
+- `Procfile` (raíz): `web` ejecuta `backend/scripts/run_migrations.py` y luego Uvicorn.
+- `backend/Procfile`: alternativa si despliegas backend con root `backend`.
 - `frontend/Procfile`: sirve build estático desde `dist`.
 - `backend/runtime.txt`: fija Python 3.11 para build compatible.
 - `railway.json`: política de despliegue (replicas/restart).
@@ -134,7 +137,10 @@ Si ves errores de CORS, revisa que:
 - Verifica que backend esté conectado al servicio PostgreSQL correcto.
 - Confirma `DATABASE_URL` en variables del backend. Para servicios dentro del mismo proyecto Railway, usa la URL privada/internal (`*.railway.internal`), no el TCP proxy público (`*.proxy.rlwy.net`).
 - Si `DATABASE_URL` quedó apuntando a `*.proxy.rlwy.net`, agrega `DATABASE_PRIVATE_URL` con la URL privada del Postgres; el backend la preferirá automáticamente.
-- Si los logs muestran `psycopg2.OperationalError` o `server closed the connection unexpectedly` contra `*.proxy.rlwy.net`, la solución recomendada es la URL privada. El runner `backend/scripts/run_migrations.py` reintenta automáticamente; también puedes aumentar `MIGRATION_MAX_ATTEMPTS`.
+- En Railway, **enlaza** el servicio Postgres al backend con variable referenciada (`${{Postgres.DATABASE_URL}}`), no copies URLs a mano. Si existe `PGHOST`, el backend lo usará para la red interna.
+- Si ves `timeout expired` contra `*.railway.internal`: Postgres puede estar apagado, en otro proyecto, o el hostname privado es incorrecto. Verifica que el servicio Postgres esté **Running** en el mismo proyecto.
+- Si la privada falla pero el proxy público conecta, deja `MIGRATION_FALLBACK_PUBLIC=1` (default) y mantén `DATABASE_URL` con el proxy; el runner probará ambas.
+- Aumenta `MIGRATION_INITIAL_DELAY_SECONDS=30` si Postgres tarda en despertar tras un deploy.
 
 ### Error 401/403 inesperado
 - Revisa `JWT_SECRET` entre despliegues (si cambia, invalida tokens).
