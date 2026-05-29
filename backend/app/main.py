@@ -19,7 +19,7 @@ from app.api.routes import kanban as kanban_routes
 from app.api.routes import users as users_routes
 from app.api.routes.multimedia import executor
 from app.core.config import get_settings
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import Base, SessionLocal, ensure_database_engine, engine
 from app.core.errors import default_code_for_status
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging
@@ -76,7 +76,9 @@ async def lifespan(app: FastAPI):
             "JWT_SECRET por defecto en producción. Configure JWT_SECRET o el servicio quedará inseguro."
         )
 
-    # Migraciones en background: Uvicorn ya escucha en PORT (evita 'Crashed' en Railway)
+    # Detectar URL de Postgres que responde (evita login 503 por URL privada caída)
+    await asyncio.to_thread(ensure_database_engine)
+
     migration_task = asyncio.create_task(asyncio.to_thread(_run_startup_migrations))
 
     if not settings.is_production:

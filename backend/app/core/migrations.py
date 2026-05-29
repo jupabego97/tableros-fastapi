@@ -13,8 +13,7 @@ from alembic.config import Config
 from loguru import logger
 from sqlalchemy.exc import DBAPIError, OperationalError
 
-from app.core.config import get_settings
-from app.core.database import get_migration_database_urls
+from app.core.database import get_runtime_database_urls, reinit_database_engine
 
 
 def _int_env(name: str, default: int) -> int:
@@ -59,16 +58,7 @@ def _host_label(url: str) -> str:
         return "unknown"
 
 
-def _use_database_url(url: str) -> None:
-    os.environ["DATABASE_URL"] = url
-    get_settings.cache_clear()
-
-
 def run_migrations() -> bool:
-    """
-    Run Alembic upgrade head. Returns True on success, False if all URLs fail.
-    Does not raise — safe to call from FastAPI lifespan.
-    """
     if os.getenv("SKIP_DB_MIGRATIONS", "").strip().lower() in {"1", "true", "yes"}:
         logger.warning("SKIP_DB_MIGRATIONS=1 — omitiendo migraciones Alembic")
         return True
@@ -82,7 +72,7 @@ def run_migrations() -> bool:
         logger.info(f"Waiting {initial_delay:.0f}s before migrations (Postgres warm-up)")
         time.sleep(initial_delay)
 
-    urls = get_migration_database_urls()
+    urls = get_runtime_database_urls()
     if not urls:
         logger.error("No database URL configured for migrations")
         return False
@@ -95,8 +85,8 @@ def run_migrations() -> bool:
     last_exc: Exception | None = None
 
     for url_index, db_url in enumerate(urls, start=1):
-        _use_database_url(db_url)
         host = _host_label(db_url)
+        config.set_main_option("sqlalchemy.url", db_url)
         for attempt in range(1, attempts_per_url + 1):
             try:
                 logger.info(
@@ -105,6 +95,7 @@ def run_migrations() -> bool:
                 )
                 command.upgrade(config, "head")
                 logger.info(f"Alembic migrations completed via {host}")
+                reinit_database_engine(db_url)
                 return True
             except Exception as exc:
                 last_exc = exc

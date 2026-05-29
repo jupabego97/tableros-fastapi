@@ -57,7 +57,8 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 | Variable | Obligatoria | Valor recomendado |
 |---|---|---|
 | `DATABASE_URL` | Sí | URL privada/internal del PostgreSQL (`*.railway.internal`); evita `*.proxy.rlwy.net` para backend dentro de Railway |
-| `DATABASE_PRIVATE_URL` | Recomendado | URL privada si `DATABASE_URL` apunta al proxy público TCP |
+| `DATABASE_PRIVATE_URL` | Opcional | Solo si `PREFER_DATABASE_PRIVATE_URL=1` y la red privada funciona |
+| `PREFER_DATABASE_PRIVATE_URL` | Opcional | `0` por defecto — usa `DATABASE_URL` tal cual (recomendado en Railway) |
 | `ENVIRONMENT` | Sí | `production` |
 | `JWT_SECRET` | Sí | Secreto largo/único (no default) |
 | `ALLOWED_ORIGINS` | Sí | URL exacta del frontend (separadas por coma si varias) |
