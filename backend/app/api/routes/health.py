@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.database import get_db
+from app.core.database import get_active_database_host, get_db
 from app.models.user import User
 from app.services.auth_service import require_role
 from app.services.gemini_service import get_gemini_service
@@ -35,6 +35,13 @@ def health_check(db: Session = Depends(get_db)):
         logger.error(f"Error en health check de BD: {e}")
         services["database"] = "unhealthy"
         health_status["status"] = "degraded"
+        host = get_active_database_host()
+        if host:
+            health_status["database_host"] = host
+        health_status["database_hint"] = (
+            "Use DATABASE_URL=${{Postgres.DATABASE_URL}} in the backend service; "
+            "remove DATABASE_PRIVATE_URL unless private networking works."
+        )
 
     gemini = get_gemini_service()
     services["gemini_ai"] = "healthy" if gemini else "unavailable"

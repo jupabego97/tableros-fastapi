@@ -68,7 +68,8 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 | `MIGRATION_INITIAL_DELAY_SECONDS` | Opcional | `15` por defecto; espera antes del primer intento (warm-up de Postgres) |
 | `MIGRATION_RETRY_BASE_SECONDS` | Opcional | `3` por defecto; espera base entre reintentos |
 | `MIGRATION_FALLBACK_PUBLIC` | Opcional | `1` por defecto; si la URL privada hace timeout, prueba el proxy TCP público |
-| `DB_CONNECT_TIMEOUT` | Opcional | `30` segundos para conectar a Postgres |
+| `DB_CONNECT_TIMEOUT` | Opcional | `15` segundos para conectar a Postgres |
+| `DB_SSLMODE` | Opcional | `require` en proxy público; `disable` en red interna (auto si vacío) |
 
 > Importante: **no** dejes `JWT_SECRET` por defecto en producción.
 

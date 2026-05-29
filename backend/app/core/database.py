@@ -1,6 +1,6 @@
 import os
 import socket
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, urlencode, urlparse, urlunparse
 
 from loguru import logger
 from sqlalchemy import create_engine, text
@@ -28,7 +28,8 @@ def _hostname(url: str) -> str:
 
 
 def _is_railway_public_proxy(url: str) -> bool:
-    return _hostname(url).endswith(".proxy.rlwy.net")
+    host = _hostname(url)
+    return host.endswith(".proxy.rlwy.net") or "rlwy.net" in host
 
 
 def _is_railway_internal(url: str) -> bool:
@@ -38,6 +39,17 @@ def _is_railway_internal(url: str) -> bool:
 
 def _prefer_private_url() -> bool:
     return os.getenv("PREFER_DATABASE_PRIVATE_URL", "0").strip().lower() in {"1", "true", "yes"}
+
+
+def _query_has_sslmode(url: str) -> bool:
+    return "sslmode" in parse_qs(urlparse(url).query, keep_blank_values=True)
+
+
+def _with_sslmode(url: str, mode: str) -> str:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    query["sslmode"] = [mode]
+    return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
 
 
 def _build_url_from_pg_vars() -> str:
@@ -50,6 +62,19 @@ def _build_url_from_pg_vars() -> str:
     database = (os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "railway").strip()
     creds = f"{quote_plus(user)}:{quote_plus(password)}@" if password else f"{quote_plus(user)}@"
     return _normalize_database_url(f"postgresql://{creds}{host}:{port}/{database}")
+
+
+def _build_url_from_railway_tcp_proxy() -> str:
+    """URL TCP pública ensamblada desde variables de Railway (más fiable que copiar a mano)."""
+    domain = (os.getenv("RAILWAY_TCP_PROXY_DOMAIN") or "").strip()
+    port = (os.getenv("RAILWAY_TCP_PROXY_PORT") or "").strip()
+    if not domain or not port:
+        return ""
+    user = (os.getenv("PGUSER") or "postgres").strip()
+    password = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
+    database = (os.getenv("PGDATABASE") or "railway").strip()
+    creds = f"{quote_plus(user)}:{quote_plus(password)}@" if password else f"{quote_plus(user)}@"
+    return _normalize_database_url(f"postgresql://{creds}{domain}:{port}/{database}")
 
 
 def _postgresql_connect_timeout() -> int:
@@ -72,6 +97,21 @@ def _ipv4_hostaddr(hostname: str) -> str | None:
     return None
 
 
+def _default_sslmode(url: str) -> str | None:
+    explicit = os.getenv("DB_SSLMODE", "").strip()
+    if explicit:
+        return explicit
+    if _query_has_sslmode(url):
+        return None
+    if _is_railway_internal(url):
+        return "disable"
+    if _is_railway_public_proxy(url):
+        return "require"
+    if get_settings().is_production:
+        return "require"
+    return None
+
+
 def _postgresql_connect_args(url: str) -> dict:
     if not url.startswith("postgresql"):
         return {}
@@ -82,6 +122,9 @@ def _postgresql_connect_args(url: str) -> dict:
         "keepalives_interval": 10,
         "keepalives_count": 5,
     }
+    sslmode = _default_sslmode(url)
+    if sslmode:
+        args["sslmode"] = sslmode
     if _is_railway_internal(url):
         hostaddr = _ipv4_hostaddr(_hostname(url))
         if hostaddr:
@@ -89,8 +132,35 @@ def _postgresql_connect_args(url: str) -> dict:
     return args
 
 
+def _url_connection_variants(url: str) -> list[str]:
+    """Genera variantes SSL para probar la URL que realmente conecta en Railway."""
+    if not url or url.startswith("sqlite"):
+        return [url] if url else []
+
+    variants: list[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: str) -> None:
+        normalized = _normalize_database_url(candidate)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            variants.append(normalized)
+
+    add(url)
+    if not _query_has_sslmode(url):
+        if _is_railway_internal(url):
+            add(_with_sslmode(url, "disable"))
+        elif _is_railway_public_proxy(url):
+            for mode in ("require", "prefer", "disable"):
+                add(_with_sslmode(url, mode))
+        elif get_settings().is_production:
+            add(_with_sslmode(url, "require"))
+            add(_with_sslmode(url, "prefer"))
+
+    return variants
+
+
 def get_database_url() -> str:
-    """URL para el pool de SQLAlchemy. Por defecto respeta DATABASE_URL tal cual en Railway."""
     settings = get_settings()
     url = _normalize_database_url(settings.database_url)
 
@@ -104,18 +174,10 @@ def get_database_url() -> str:
         return url
 
     if private_url and (url == "sqlite:///./tableros.db" or _is_railway_public_proxy(url)):
-        logger.info(f"Using DATABASE_PRIVATE_URL ({_hostname(private_url)})")
         return private_url
 
     if pg_url and (url == "sqlite:///./tableros.db" or _is_railway_public_proxy(url)):
-        logger.info(f"Using PGHOST URL ({_hostname(pg_url)})")
         return pg_url
-
-    if settings.is_production and _is_railway_public_proxy(url):
-        logger.warning(
-            "DATABASE_URL uses public TCP proxy. Set PREFER_DATABASE_PRIVATE_URL=1 only if "
-            "private networking is confirmed working."
-        )
 
     return url
 
@@ -132,42 +194,28 @@ def _unique_urls(*candidates: str) -> list[str]:
 
 
 def get_runtime_database_urls() -> list[str]:
-    """Orden para la API: primero DATABASE_URL (suele ser el proxy público que conecta)."""
+    """URLs base + variantes SSL, priorizando proxy TCP pública de Railway."""
     settings = get_settings()
-    raw = _normalize_database_url(settings.database_url)
-    private = _normalize_database_url(settings.database_private_url.strip())
-    pg_url = _build_url_from_pg_vars()
-    computed = get_database_url()
-
-    return _unique_urls(raw, computed, private, pg_url)
-
-
-def get_migration_database_urls() -> list[str]:
-    """Orden para migraciones: privada primero, luego pública como fallback."""
-    settings = get_settings()
-    urls = _unique_urls(
-        get_database_url() if _prefer_private_url() else "",
+    bases = _unique_urls(
         _normalize_database_url(settings.database_url),
+        _build_url_from_railway_tcp_proxy(),
+        get_database_url(),
         _normalize_database_url(settings.database_private_url.strip()),
         _build_url_from_pg_vars(),
     )
-    if not urls:
-        urls = get_runtime_database_urls()
 
-    if _is_railway_public_proxy(_normalize_database_url(settings.database_url)):
-        proxy = _normalize_database_url(settings.database_url)
-        if proxy not in urls:
-            urls.append(proxy)
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for base in bases:
+        for variant in _url_connection_variants(base):
+            if variant not in seen:
+                seen.add(variant)
+                expanded.append(variant)
+    return expanded
 
-    if os.getenv("MIGRATION_FALLBACK_PUBLIC", "1").strip().lower() in {"1", "true", "yes"}:
-        for key in ("DATABASE_PUBLIC_URL", "DATABASE_URL_PUBLIC"):
-            fallback = os.getenv(key, "").strip()
-            if fallback:
-                fb = _normalize_database_url(fallback)
-                if fb not in urls:
-                    urls.append(fb)
 
-    return urls
+def get_migration_database_urls() -> list[str]:
+    return get_runtime_database_urls()
 
 
 def test_database_url(url: str) -> bool:
@@ -183,7 +231,7 @@ def test_database_url(url: str) -> bool:
         probe.dispose()
         return True
     except Exception as exc:
-        logger.debug(f"DB probe failed for {_hostname(url)}: {exc}")
+        logger.info(f"DB probe failed [{_hostname(url)} ssl={_default_sslmode(url)}]: {exc}")
         return False
 
 
@@ -201,7 +249,7 @@ def reinit_database_engine(url: str | None = None) -> None:
         target = get_database_url()
 
     _active_database_url = target
-    logger.info(f"Database engine -> {_hostname(target)}")
+    logger.info(f"Database engine -> {_hostname(target)} (sslmode={_default_sslmode(target) or 'url'})")
 
     if target.startswith("sqlite"):
         _engine = create_engine(
@@ -222,7 +270,6 @@ def reinit_database_engine(url: str | None = None) -> None:
 
 
 def ensure_database_engine() -> bool:
-    """Prueba URLs en orden y deja el pool apuntando a la que responde."""
     for url in get_runtime_database_urls():
         if test_database_url(url):
             if url != _active_database_url:
@@ -231,16 +278,22 @@ def ensure_database_engine() -> bool:
                 reinit_database_engine(url)
             return True
 
+    hosts = ", ".join(_hostname(u) for u in get_runtime_database_urls()[:6])
     logger.error(
-        "No se pudo conectar a Postgres con ninguna URL configurada. "
-        f"Probadas: {', '.join(_hostname(u) for u in get_runtime_database_urls())}"
+        "No Postgres connection succeeded. Check DATABASE_URL=${{Postgres.DATABASE_URL}} "
+        f"and that Postgres is Running. Tried hosts: {hosts}"
     )
     if _engine is None:
         reinit_database_engine()
     return False
 
 
-# Inicialización al importar (tests / dev)
+def get_active_database_host() -> str | None:
+    if _active_database_url:
+        return _hostname(_active_database_url)
+    return None
+
+
 reinit_database_engine()
 
 
@@ -264,14 +317,12 @@ def _session_factory():
     return _SessionLocal
 
 
-class SessionLocal:
-    """Sessionmaker actualizable tras detectar la URL de BD que funciona."""
-
+class _SessionLocalCallable:
     def __call__(self):
         return _session_factory()()
 
 
-SessionLocal = SessionLocal()
+SessionLocal = _SessionLocalCallable()
 
 
 class Base(DeclarativeBase):
