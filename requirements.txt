@@ -1,0 +1,3 @@
+# Railway/Nixpacks/Railpack look for requirements at the service root.
+# When Root Directory is `.`, install backend deps from here.
+-r backend/requirements.txt

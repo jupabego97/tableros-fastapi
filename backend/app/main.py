@@ -76,20 +76,35 @@ async def lifespan(app: FastAPI):
             "JWT_SECRET por defecto en producción. Configure JWT_SECRET o el servicio quedará inseguro."
         )
 
-    # Detectar URL de Postgres que responde (evita login 503 por URL privada caída)
-    await asyncio.to_thread(ensure_database_engine)
+    # Abrir el puerto YA: probes/migraciones NO deben bloquear el lifespan.
+    # En Railway, ensure_database_engine puede tardar minutos si Postgres no responde
+    # (varias URLs × connect_timeout) y el healthcheck marca Crashed.
+    async def _boot_database() -> None:
+        ok = await asyncio.to_thread(ensure_database_engine)
+        if not ok:
+            logger.error(
+                "Boot: ninguna DATABASE_URL respondió. /health/live sigue OK; "
+                "revisa el enlace a Postgres y DATABASE_URL=${{Postgres.DATABASE_URL}}."
+            )
+        await asyncio.to_thread(_run_startup_migrations)
+        await asyncio.to_thread(_run_startup_db_tasks, settings)
 
-    migration_task = asyncio.create_task(asyncio.to_thread(_run_startup_migrations))
+    boot_task = asyncio.create_task(_boot_database())
 
     if not settings.is_production:
-        Base.metadata.create_all(bind=engine)
-
-    _run_startup_db_tasks(settings)
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as e:
+            logger.warning(f"create_all skipped (DB unavailable?): {e}")
 
     yield
 
-    if not migration_task.done():
-        migration_task.cancel()
+    if not boot_task.done():
+        boot_task.cancel()
+        try:
+            await boot_task
+        except asyncio.CancelledError:
+            pass
     executor.shutdown(wait=True)
 
 

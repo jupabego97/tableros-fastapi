@@ -39,8 +39,8 @@ Frontend en http://localhost:5173 (proxy a API en 8000)
 
 Backend, frontend y base de datos como servicios separados. Ver **[README_RAILWAY.md](README_RAILWAY.md)** para instrucciones detalladas.
 
-- **Backend**: Root = `.` (usa Procfile raíz)
-- **Frontend**: Root = `frontend` (usa frontend/Procfile)
+- **Backend**: Root Directory = `backend` (requirements + Procfile ahí)
+- **Frontend**: Root Directory = `frontend` (usa frontend/Procfile)
 - **Database**: Add PostgreSQL desde Railway
 
 ## Rollback
