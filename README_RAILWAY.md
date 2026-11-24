@@ -48,9 +48,10 @@ Este repositorio queda preparado para desplegarse en Railway desde GitHub con **
 
 1. `+ New` → `GitHub Repo` → selecciona este repo.
 2. En `Settings` del servicio backend:
-   - **Root Directory**: `.` (raíz, usa `Procfile` de raíz)
-   - **Start Command**: vacío (usa Procfile)
-   - **Build Command**: vacío (auto por Nixpacks)
+   - **Root Directory**: `backend` ← **obligatorio** en monorepo (ahí están `requirements.txt`, `runtime.txt` y `Procfile`)
+   - **Config file path** (si lo pide): `/backend/railway.json`
+   - **Start Command**: vacío (usa `backend/Procfile` / `backend/railway.json`)
+   - **Build Command**: vacío (Nixpacks/Railpack instala `requirements.txt`)
 3. En `Networking`, genera dominio público.
 4. En `Variables`, define:
 
@@ -125,15 +126,25 @@ Si ves errores de CORS, revisa que:
 
 ## 7) Archivos relevantes para Railway en este repo
 
-- `Procfile` (raíz): `web` ejecuta `backend/scripts/run_migrations.py` y luego Uvicorn.
-- `backend/Procfile`: alternativa si despliegas backend con root `backend`.
+- `backend/` — **Root Directory recomendado** del servicio API.
+- `backend/Procfile` / `backend/railway.json`: Uvicorn en `0.0.0.0:$PORT` + healthcheck `/health/live`.
+- `backend/requirements.txt` + `backend/runtime.txt`: dependencias y Python 3.11.
+- `requirements.txt` / `nixpacks.toml` / `railway.json` (raíz): fallback si el servicio apunta a `.` (instala `backend/requirements.txt`).
 - `frontend/Procfile`: sirve build estático desde `dist`.
-- `backend/runtime.txt`: fija Python 3.11 para build compatible.
-- `railway.json`: política de despliegue (replicas/restart).
 
 ---
 
 ## 8) Troubleshooting rápido
+
+### Build falla / `uvicorn: command not found` / no instala FastAPI
+- El servicio backend debe tener **Root Directory = `backend`**. Si queda en `/`, Nixpacks ve el `pyproject.toml` de tooling sin dependencias y **no** instala `backend/requirements.txt`.
+- Tras cambiar Root Directory, fuerza un **Redeploy**.
+- Alternativa: Root `.` + los archivos `requirements.txt` / `nixpacks.toml` de la raíz (ya incluidos).
+
+### Deploy queda en Crashed / healthcheck timeout
+- Confirma `JWT_SECRET` fuerte y `ENVIRONMENT=production` (sin `JWT_SECRET` el proceso aborta al arrancar).
+- El healthcheck debe ser `/health/live` (no `/health`, que depende de Postgres).
+- Probes y migraciones corren en background; el puerto abre de inmediato.
 
 ### Error de conexión DB
 - Verifica que backend esté conectado al servicio PostgreSQL correcto.
