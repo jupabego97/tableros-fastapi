@@ -15,8 +15,20 @@ _active_database_url: str | None = None
 
 
 def _normalize_database_url(url: str) -> str:
+    """Normaliza el scheme de Postgres al driver que instalamos (psycopg2).
+
+    SQLAlchemy 2.1+ resuelve ``postgresql://`` a ``psycopg`` (v3). En Railway
+    eso revienta el import con ``ModuleNotFoundError: No module named 'psycopg'``
+    porque ``requirements.txt`` trae ``psycopg2-binary``, no ``psycopg``.
+    """
+    if not url:
+        return url
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql://", 1)
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + url[len("postgresql://") :]
+    if url.startswith("postgresql+psycopg://"):
+        return "postgresql+psycopg2://" + url[len("postgresql+psycopg://") :]
     return url
 
 
@@ -294,7 +306,11 @@ def get_active_database_host() -> str | None:
     return None
 
 
-reinit_database_engine()
+try:
+    reinit_database_engine()
+except Exception as exc:
+    # No tumbar el import de uvicorn: el boot en lifespan reintenta.
+    logger.error(f"Initial database engine setup failed: {exc}")
 
 
 class _EngineAccessor:
