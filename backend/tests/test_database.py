@@ -30,7 +30,9 @@ def test_uses_database_url_by_default_without_private_preference(monkeypatch):
         "postgresql://user:pass@postgres.railway.internal:5432/railway",
     )
     monkeypatch.delenv("PREFER_DATABASE_PRIVATE_URL", raising=False)
-    assert get_database_url() == "postgresql://user:pass@trolley.proxy.rlwy.net:19817/railway"
+    assert get_database_url() == (
+        "postgresql+psycopg2://user:pass@trolley.proxy.rlwy.net:19817/railway"
+    )
 
 
 def test_prefers_private_url_when_flag_set(monkeypatch):
@@ -43,7 +45,9 @@ def test_prefers_private_url_when_flag_set(monkeypatch):
         "postgresql://user:pass@postgres.railway.internal:5432/railway",
     )
     monkeypatch.setenv("PREFER_DATABASE_PRIVATE_URL", "1")
-    assert get_database_url() == "postgresql://user:pass@postgres.railway.internal:5432/railway"
+    assert get_database_url() == (
+        "postgresql+psycopg2://user:pass@postgres.railway.internal:5432/railway"
+    )
 
 
 def test_runtime_urls_put_public_first(monkeypatch):
@@ -62,7 +66,21 @@ def test_runtime_urls_put_public_first(monkeypatch):
 def test_normalizes_postgres_scheme(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgres://user:pass@localhost/db")
     monkeypatch.delenv("DATABASE_PRIVATE_URL", raising=False)
-    assert get_database_url() == "postgresql://user:pass@localhost/db"
+    assert get_database_url() == "postgresql+psycopg2://user:pass@localhost/db"
+
+
+def test_forces_psycopg2_dialect_for_sqlalchemy_21(monkeypatch):
+    """SQLAlchemy 2.1 mapea postgresql:// → psycopg v3; forzar psycopg2."""
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://user:pass@postgres.railway.internal:5432/railway",
+    )
+    monkeypatch.delenv("DATABASE_PRIVATE_URL", raising=False)
+    url = get_database_url()
+    assert url.startswith("postgresql+psycopg2://")
+    from sqlalchemy.engine.url import make_url
+
+    assert make_url(url).get_dialect().driver == "psycopg2"
 
 
 def test_detects_railway_hosts():
